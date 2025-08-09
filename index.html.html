@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cristiana & Tibi - Nunta</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&family=Great+Vibes&display=swap');
+
+        body {
+            font-family: 'Dancing Script', cursive;
+            background: linear-gradient(135deg, #ffdde1, #ee9ca7);
+            text-align: center;
+            padding: 30px 20px;
+            color: #5a381e;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        header {
+            padding: 20px;
+        }
+        h1 {
+            font-family: 'Great Vibes', cursive;
+            font-size: 4.5em;
+            margin: 0;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.15);
+        }
+        .wedding-photo {
+            height: 8em;
+            border-radius: 20px;
+            box-shadow: 0px 8px 20px rgba(0,0,0,0.35);
+            margin-bottom: 5px;
+            border: 4px solid white;
+            object-fit: cover;
+        }
+        .upload-btn {
+            background: linear-gradient(135deg, #ff7f9e, #ff4d6d);
+            color: white;
+            padding: 15px 40px;
+            font-size: 1.4em;
+            font-weight: bold;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.25);
+            transition: all 0.3s ease;
+            margin-top: 25px;
+        }
+        .upload-btn:hover {
+            background: linear-gradient(135deg, #ff4d6d, #ff7f9e);
+            transform: translateY(-3px) scale(1.05);
+        }
+        #preview {
+            margin-top: 40px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            max-width: 90%;
+        }
+        img, video {
+            max-width: 250px;
+            border-radius: 15px;
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        img:hover, video:hover {
+            transform: scale(1.05);
+            box-shadow: 0px 6px 20px rgba(0,0,0,0.4);
+        }
+        footer {
+            position: absolute;
+            bottom: 10px;
+            font-size: 1.1em;
+            color: rgba(0,0,0,0.7);
+        }
+        .hearts {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .heart {
+            position: absolute;
+            color: rgba(255, 105, 180, 0.7);
+            animation: floatHearts 10s linear infinite;
+        }
+        @keyframes floatHearts {
+            0% { transform: translateY(100%); opacity: 1; }
+            100% { transform: translateY(-10%); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="hearts">
+        <div class="heart" style="left:10%; font-size: 2em;">❤</div>
+        <div class="heart" style="left:30%; font-size: 1.5em; animation-delay: 2s;">❤</div>
+        <div class="heart" style="left:50%; font-size: 2.5em; animation-delay: 4s;">❤</div>
+        <div class="heart" style="left:70%; font-size: 1.8em; animation-delay: 6s;">❤</div>
+        <div class="heart" style="left:90%; font-size: 2em; animation-delay: 8s;">❤</div>
+    </div>
+
+    <header>
+        <img src="tibi.jpg" alt="Cristiana & Tibi" class="wedding-photo">
+        <h1>💍 Cristiana & Tibi 💍</h1>
+    </header>
+    
+    <label for="fileInput" class="upload-btn">📸 Încarcă poze sau videoclipuri</label>
+    <input type="file" id="fileInput" accept="image/*,video/*" capture multiple style="display:none;">
+
+    <div id="preview"></div>
+
+    <footer>
+        Cu drag, vă așteptăm la celebrarea iubirii noastre ❤️
+    </footer>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('preview');
+
+        fileInput.addEventListener('change', (event) => {
+            const files = event.target.files;
+            preview.innerHTML = '';
+
+            Array.from(files).forEach(file => {
+                const url = URL.createObjectURL(file);
+                if (file.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    preview.appendChild(img);
+                } else if (file.type.startsWith('video/')) {
+                    const video = document.createElement('video');
+                    video.src = url;
+                    video.controls = true;
+                    preview.appendChild(video);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
