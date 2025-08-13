@@ -28,8 +28,6 @@ h1 { font-family: 'Great Vibes', cursive; font-size: 3em; margin-bottom: 10px; }
     border-radius: 8px;
     cursor: pointer;
 }
-
-/* Lightbox */
 #lightbox {
     position: fixed;
     display: none;
@@ -65,13 +63,28 @@ h1 { font-family: 'Great Vibes', cursive; font-size: 3em; margin-bottom: 10px; }
 <button id="uploadBtn">📸 Încarcă poze sau videoclipuri</button>
 <div id="preview"></div>
 
-<!-- Lightbox -->
 <div id="lightbox">
     <span class="arrow left">&#10094;</span>
     <span class="arrow right">&#10095;</span>
 </div>
 
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
 <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAIeoK-hVEcb9ql1eX5ZzXBHCohuSZTAG4",
+  authDomain: "cununie-54151.firebaseapp.com",
+  projectId: "cununie-54151",
+  storageBucket: "cununie-54151.firebasestorage.app",
+  messagingSenderId: "847742419904",
+  appId: "1:847742419904:web:36b2a2eefe57ed6cc03e25"
+};
+
+firebase.initializeApp(firebaseConfig);
+const storage = firebase.storage();
+
 const fileInput = document.getElementById('fileInput');
 const uploadBtn = document.getElementById('uploadBtn');
 const preview = document.getElementById('preview');
@@ -86,32 +99,47 @@ uploadBtn.onclick = () => fileInput.click();
 
 fileInput.onchange = async (e) => {
     const files = e.target.files;
-    const formData = new FormData();
-    for (let file of files) formData.append('file', file);
-    await fetch('/upload', {method:'POST', body: formData});
+    const uploadPromises = [];
+    for (let file of files) {
+        const storageRef = storage.ref('uploads/' + file.name + '-' + Date.now());
+        uploadPromises.push(storageRef.put(file));
+    }
+    await Promise.all(uploadPromises);
+    alert('Fișiere încărcate!');
     loadMedia();
 };
 
 async function loadMedia() {
     preview.innerHTML = '';
-    const res = await fetch('/list_media');
-    mediaList = await res.json();
-    mediaList.forEach((media, i) => {
+    const listRef = storage.ref('uploads');
+    const res = await listRef.listAll();
+    mediaList = [];
+
+    // Obținem URL-urile paralel
+    const items = await Promise.all(res.items.map(async itemRef => {
+        const url = await itemRef.getDownloadURL();
+        const type = itemRef.name.match(/\.(mp4|webm|ogg)$/i) ? 'video' : 'image';
+        return { type, url };
+    }));
+
+    items.forEach((media, index) => {
         let elem;
-        if(media.type === 'video') {
+        if (media.type === 'video') {
             elem = document.createElement('video');
-            elem.src = media.thumb;
+            elem.src = media.url;
+            elem.controls = false;
             elem.muted = true;
             elem.loop = true;
             elem.autoplay = true;
         } else {
             elem = document.createElement('img');
-            elem.src = media.thumb;
+            elem.src = media.url; // dacă ai thumbnail, pune url-ul thumbnail-ului aici
             elem.loading = 'lazy';
         }
-        elem.dataset.index = i;
-        elem.addEventListener('click', ()=>openLightbox(i));
+        elem.dataset.index = index;
+        elem.addEventListener('click', () => openLightbox(index));
         preview.appendChild(elem);
+        mediaList.push(media);
     });
 }
 
@@ -125,7 +153,7 @@ function showLightbox() {
     lightbox.querySelectorAll('img,video').forEach(el => el.remove());
     const media = mediaList[currentIndex];
     let elem;
-    if(media.type === 'video') {
+    if (media.type === 'video') {
         elem = document.createElement('video');
         elem.src = media.url;
         elem.controls = true;
@@ -136,9 +164,9 @@ function showLightbox() {
     }
     lightbox.appendChild(elem);
 }
-lightbox.onclick = (e) => { if(e.target===lightbox) lightbox.style.display='none'; }
-leftArrow.onclick = (e)=>{ e.stopPropagation(); currentIndex=(currentIndex-1+mediaList.length)%mediaList.length; showLightbox(); }
-rightArrow.onclick = (e)=>{ e.stopPropagation(); currentIndex=(currentIndex+1)%mediaList.length; showLightbox(); }
+lightbox.onclick = (e) => { if (e.target === lightbox) lightbox.style.display = 'none'; }
+leftArrow.onclick = (e) => { e.stopPropagation(); currentIndex = (currentIndex-1+mediaList.length)%mediaList.length; showLightbox(); }
+rightArrow.onclick = (e) => { e.stopPropagation(); currentIndex = (currentIndex+1)%mediaList.length; showLightbox(); }
 
 loadMedia();
 </script>
