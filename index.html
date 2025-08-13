@@ -1,48 +1,35 @@
 <!DOCTYPE html>
 <html lang="ro">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cristiana & Tibi - Galerie</title>
 <style>
-  body {
+body {
     font-family: 'Arial', sans-serif;
     background: linear-gradient(135deg, #ffdde1, #ee9ca7);
     margin: 0;
     padding: 20px;
     color: #5a381e;
     text-align: center;
-  }
-  h1 {
-    font-family: 'Great Vibes', cursive;
-    font-size: 3em;
-    margin-bottom: 10px;
-  }
-  #uploadBtn {
-    padding: 12px 30px;
-    font-size: 1.2em;
-    border-radius: 50px;
-    background: #ff4d6d;
-    color: white;
-    border: none;
-    cursor: pointer;
-    margin: 20px 0;
-  }
-  #preview {
+}
+h1 { font-family: 'Great Vibes', cursive; font-size: 3em; margin-bottom: 10px; }
+#uploadBtn { padding: 12px 30px; font-size: 1.2em; border-radius: 50px; background: #ff4d6d; color: white; border: none; cursor: pointer; margin: 20px 0; }
+#preview {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: 5px;
     justify-items: center;
-  }
-  #preview img, #preview video {
+}
+#preview img, #preview video {
     width: 100%;
     height: 100px;
     object-fit: cover;
     border-radius: 8px;
     cursor: pointer;
-  }
-  /* Lightbox */
-  #lightbox {
+}
+/* Lightbox */
+#lightbox {
     position: fixed;
     display: none;
     top:0; left:0;
@@ -51,27 +38,22 @@
     justify-content: center;
     align-items: center;
     z-index: 1000;
-    overflow: hidden;
-  }
-  #lightbox img, #lightbox video {
-    max-width: 95%;
-    max-height: 95%;
-    border-radius: 10px;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-  }
-  /* Săgeți */
-  .arrow {
+}
+#lightbox img, #lightbox video { max-width: 95%; max-height: 95%; border-radius: 10px; }
+.arrow {
     position: absolute;
     top: 50%;
-    transform: translateY(-50%);
-    color: white;
     font-size: 3em;
+    color: white;
+    background: rgba(0,0,0,0.3);
+    padding: 10px;
+    border-radius: 50%;
     cursor: pointer;
     user-select: none;
-    z-index: 1001;
-  }
-  .arrow.left { left: 10px; }
-  .arrow.right { right: 10px; }
+    transform: translateY(-50%);
+}
+.arrow.left { left: 10px; }
+.arrow.right { right: 10px; }
 </style>
 </head>
 <body>
@@ -80,16 +62,15 @@
 
 <input type="file" id="fileInput" accept="image/*,video/*" multiple style="display:none" />
 <button id="uploadBtn">📸 Încarcă poze sau videoclipuri</button>
-
 <div id="preview"></div>
 
 <!-- Lightbox -->
 <div id="lightbox">
-  <span class="arrow left">&#10094;</span>
-  <span class="arrow right">&#10095;</span>
+    <span class="arrow left">&#10094;</span>
+    <span class="arrow right">&#10095;</span>
 </div>
 
-<!-- Firebase SDK -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
@@ -100,8 +81,7 @@ const firebaseConfig = {
   projectId: "cununie-54151",
   storageBucket: "cununie-54151.firebasestorage.app",
   messagingSenderId: "847742419904",
-  appId: "1:847742419904:web:36b2a2eefe57ed6cc03e25",
-  measurementId: "G-808VQG01VC"
+  appId: "1:847742419904:web:36b2a2eefe57ed6cc03e25"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -111,86 +91,77 @@ const fileInput = document.getElementById('fileInput');
 const uploadBtn = document.getElementById('uploadBtn');
 const preview = document.getElementById('preview');
 const lightbox = document.getElementById('lightbox');
-const leftArrow = lightbox.querySelector('.arrow.left');
-const rightArrow = lightbox.querySelector('.arrow.right');
+const leftArrow = document.querySelector('.arrow.left');
+const rightArrow = document.querySelector('.arrow.right');
 
-let mediaElements = [];
+let mediaList = [];
 let currentIndex = 0;
 
 uploadBtn.onclick = () => fileInput.click();
 
 fileInput.onchange = async (e) => {
-  const files = e.target.files;
-  for(let file of files){
-    const storageRef = storage.ref('uploads/' + file.name + '-' + Date.now());
-    await storageRef.put(file);
-  }
-  alert('Fișiere încărcate!');
-  loadMedia();
+    const files = e.target.files;
+    for (let file of files) {
+        const storageRef = storage.ref('uploads/' + file.name + '-' + Date.now());
+        await storageRef.put(file);
+    }
+    alert('Fișiere încărcate!');
+    loadMedia();
 };
 
-async function loadMedia(){
-  preview.innerHTML = '';
-  mediaElements = [];
-  const listRef = storage.ref('uploads');
-  const res = await listRef.listAll();
-  for(const itemRef of res.items){
-    const url = await itemRef.getDownloadURL();
-    let elem;
-    if(itemRef.name.match(/\.(mp4|webm|ogg)$/i)){
-      elem = document.createElement('video');
-      elem.src = url;
-      elem.controls = false;
-      elem.muted = true;
-      elem.loop = true;
-      elem.autoplay = true;
-    } else {
-      elem = document.createElement('img');
-      elem.src = url;
+async function loadMedia() {
+    preview.innerHTML = '';
+    const listRef = storage.ref('uploads');
+    const res = await listRef.listAll();
+    mediaList = [];
+    for (const itemRef of res.items) {
+        const url = await itemRef.getDownloadURL();
+        let elem;
+        if (itemRef.name.match(/\.(mp4|webm|ogg)$/i)) {
+            elem = document.createElement('video');
+            elem.src = url;
+            elem.controls = false;
+            elem.muted = true;
+            elem.loop = true;
+            elem.autoplay = true;
+        } else {
+            elem = document.createElement('img');
+            elem.src = url;
+            elem.loading = 'lazy'; // lazy load
+        }
+        elem.dataset.index = mediaList.length;
+        elem.addEventListener('click', () => openLightbox(parseInt(elem.dataset.index)));
+        preview.appendChild(elem);
+        mediaList.push({type: elem.tagName.toLowerCase(), url});
     }
-    // click si touch
-    elem.addEventListener('click', () => openLightbox(mediaElements.indexOf(elem)));
-    elem.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      openLightbox(mediaElements.indexOf(elem));
-    });
-    preview.appendChild(elem);
-    mediaElements.push(elem);
-  }
 }
 
 // Lightbox
 function openLightbox(index) {
-  currentIndex = index;
-  lightbox.innerHTML = '';
-  
-  const clone = mediaElements[index].cloneNode(true);
-  clone.style.maxWidth = '95%';
-  clone.style.maxHeight = '95%';
-  clone.style.borderRadius = '10px';
-  lightbox.appendChild(clone);
-
-  // adauga sageti
-  lightbox.appendChild(leftArrow);
-  lightbox.appendChild(rightArrow);
-
-  lightbox.style.display = 'flex';
-
-  leftArrow.onclick = (e) => { e.stopPropagation(); prevMedia(); };
-  rightArrow.onclick = (e) => { e.stopPropagation(); nextMedia(); };
-
-  lightbox.onclick = () => { lightbox.style.display = 'none'; };
+    currentIndex = index;
+    showLightbox();
+    lightbox.style.display = 'flex';
 }
-
-function prevMedia() {
-  currentIndex = (currentIndex - 1 + mediaElements.length) % mediaElements.length;
-  openLightbox(currentIndex);
+function showLightbox() {
+    lightbox.querySelectorAll('img,video').forEach(el => el.remove());
+    const media = mediaList[currentIndex];
+    let elem;
+    if (media.type === 'video') {
+        elem = document.createElement('video');
+        elem.src = media.url;
+        elem.controls = true;
+        elem.autoplay = true;
+    } else {
+        elem = document.createElement('img');
+        elem.src = media.url;
+    }
+    lightbox.appendChild(elem);
 }
-
-function nextMedia() {
-  currentIndex = (currentIndex + 1) % mediaElements.length;
-  openLightbox(currentIndex);
+lightbox.onclick = (e) => {
+    if (e.target === lightbox) lightbox.style.display = 'none';
 }
+leftArrow.onclick = (e) => { e.stopPropagation(); currentIndex = (currentIndex-1+mediaList.length)%mediaList.length; showLightbox(); }
+rightArrow.onclick = (e) => { e.stopPropagation(); currentIndex = (currentIndex+1)%mediaList.length; showLightbox(); }
 
 loadMedia();
 </script>
