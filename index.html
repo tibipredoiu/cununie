@@ -62,8 +62,22 @@
     max-height: 95%;
     border-radius: 10px;
     box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    transition: transform 0.3s;
   }
+  .arrow {
+    position: fixed;
+    top: 50%;
+    font-size: 3em;
+    color: white;
+    background: rgba(0,0,0,0.3);
+    padding: 10px;
+    border-radius: 50%;
+    cursor: pointer;
+    user-select: none;
+    z-index: 1001;
+    transform: translateY(-50%);
+  }
+  #prevArrow { left: 10px; }
+  #nextArrow { right: 10px; }
 </style>
 </head>
 <body>
@@ -75,8 +89,10 @@
 
 <div id="preview"></div>
 
-<!-- Lightbox -->
+<!-- Lightbox și săgeți -->
 <div id="lightbox"></div>
+<div id="prevArrow" class="arrow">&#10094;</div>
+<div id="nextArrow" class="arrow">&#10095;</div>
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -100,6 +116,11 @@ const fileInput = document.getElementById('fileInput');
 const uploadBtn = document.getElementById('uploadBtn');
 const preview = document.getElementById('preview');
 const lightbox = document.getElementById('lightbox');
+const prevArrow = document.getElementById('prevArrow');
+const nextArrow = document.getElementById('nextArrow');
+
+let mediaList = [];
+let currentIndex = 0;
 
 uploadBtn.onclick = () => fileInput.click();
 
@@ -117,6 +138,7 @@ async function loadMedia(){
   preview.innerHTML = '';
   const listRef = storage.ref('uploads');
   const res = await listRef.listAll();
+  mediaList = [];
   for(const itemRef of res.items){
     const url = await itemRef.getDownloadURL();
     let elem;
@@ -131,70 +153,66 @@ async function loadMedia(){
       elem = document.createElement('img');
       elem.src = url;
     }
-    elem.addEventListener('click', (e) => openLightbox(elem, e));
+    const index = mediaList.length;
+    elem.addEventListener('click', () => openLightbox(index));
     preview.appendChild(elem);
+    mediaList.push({type: elem.tagName.toLowerCase(), src: url});
   }
 }
 
-// Lightbox cu animație tip Instagram
-function openLightbox(originalElem, event) {
-  const rect = originalElem.getBoundingClientRect();
-  const clone = originalElem.cloneNode(true);
-
-  // Poziționează clone exact peste thumbnail
-  clone.style.position = 'fixed';
-  clone.style.top = rect.top + 'px';
-  clone.style.left = rect.left + 'px';
-  clone.style.width = rect.width + 'px';
-  clone.style.height = rect.height + 'px';
-  clone.style.margin = 0;
-  clone.style.zIndex = 1001;
-  clone.style.borderRadius = '8px';
-  clone.style.transition = 'all 0.3s ease';
-
+// Lightbox
+function showMedia() {
   lightbox.innerHTML = '';
-  lightbox.appendChild(clone);
-  lightbox.style.display = 'flex';
-
-  // Trigger animatie spre centru
-  requestAnimationFrame(() => {
-    clone.style.top = '50%';
-    clone.style.left = '50%';
-    clone.style.transform = 'translate(-50%, -50%)';
-    clone.style.width = '95%';
-    clone.style.height = 'auto';
-    clone.style.borderRadius = '10px';
-  });
-
-  // Fullscreen direct
-  openFullscreen(clone);
-
-  // Click pe lightbox pentru închidere
-  lightbox.onclick = () => {
-    // Animatie inapoi
-    clone.style.top = rect.top + 'px';
-    clone.style.left = rect.left + 'px';
-    clone.style.width = rect.width + 'px';
-    clone.style.height = rect.height + 'px';
-    clone.style.transform = 'translate(0,0)';
-    clone.style.borderRadius = '8px';
-    setTimeout(() => {
-      closeFullscreen();
-      lightbox.style.display = 'none';
-    }, 300);
-  };
+  const item = mediaList[currentIndex];
+  let elem;
+  if(item.type === 'video'){
+    elem = document.createElement('video');
+    elem.src = item.src;
+    elem.controls = true;
+    elem.autoplay = true;
+  } else {
+    elem = document.createElement('img');
+    elem.src = item.src;
+  }
+  lightbox.appendChild(elem);
 }
+
+function openLightbox(index){
+  currentIndex = index;
+  showMedia();
+  lightbox.style.display = 'flex';
+  prevArrow.style.display = 'block';
+  nextArrow.style.display = 'block';
+  openFullscreen(lightbox);
+}
+
+function closeLightbox() {
+  lightbox.style.display = 'none';
+  prevArrow.style.display = 'none';
+  nextArrow.style.display = 'none';
+  closeFullscreen();
+}
+
+// Navigare
+function prevMedia(){
+  currentIndex = (currentIndex - 1 + mediaList.length) % mediaList.length;
+  showMedia();
+}
+function nextMedia(){
+  currentIndex = (currentIndex + 1) % mediaList.length;
+  showMedia();
+}
+
+prevArrow.onclick = (e) => { e.stopPropagation(); prevMedia(); };
+nextArrow.onclick = (e) => { e.stopPropagation(); nextMedia(); };
+lightbox.onclick = closeLightbox;
 
 // Fullscreen universal
 function openFullscreen(elem) {
   if(elem.requestFullscreen) elem.requestFullscreen();
   else if(elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
   else if(elem.msRequestFullscreen) elem.msRequestFullscreen();
-  else if(elem.webkitEnterFullscreen) elem.webkitEnterFullscreen(); // iOS video
-  else { // fallback pentru imagini pe iOS
-    if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
-    else if(document.documentElement.webkitRequestFullscreen) document.documentElement.webkitRequestFullscreen();
-  }
+  else if(elem.webkitEnterFullscreen) elem.webkitEnterFullscreen();
 }
 
 function closeFullscreen() {
@@ -202,6 +220,26 @@ function closeFullscreen() {
   else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
   else if(document.msExitFullscreen) document.msExitFullscreen();
 }
+
+// Swipe touch & drag mouse
+let startX = 0;
+let endX = 0;
+let isDragging = false;
+
+function handleSwipe() {
+  const diff = startX - endX;
+  const threshold = 50;
+  if(diff > threshold) nextMedia();
+  else if(diff < -threshold) prevMedia();
+}
+
+lightbox.addEventListener('touchstart', (e) => startX = e.touches[0].clientX);
+lightbox.addEventListener('touchmove', (e) => endX = e.touches[0].clientX);
+lightbox.addEventListener('touchend', handleSwipe);
+
+lightbox.addEventListener('mousedown', (e) => { isDragging = true; startX = e.clientX; });
+lightbox.addEventListener('mousemove', (e) => { if(isDragging) endX = e.clientX; });
+lightbox.addEventListener('mouseup', () => { if(isDragging){ handleSwipe(); isDragging=false; } });
 
 loadMedia();
 </script>
