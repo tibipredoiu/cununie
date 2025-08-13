@@ -27,22 +27,21 @@
     cursor: pointer;
     margin: 20px 0;
   }
-  /* GALERIE GRID */
+
+  /* --- GALERIE TIP TELEFON --- */
   #preview {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 15px;
-    padding: 10px;
-    max-width: 1200px;
-    margin: auto;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 4px;
+    max-width: 100%;
   }
   #preview img, 
   #preview video {
     width: 100%;
-    height: auto;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    aspect-ratio: 1 / 1;
     object-fit: cover;
+    border-radius: 0;
+    box-shadow: none;
     transition: transform 0.2s ease-in-out;
     cursor: pointer;
   }
@@ -50,8 +49,14 @@
   #preview video:hover {
     transform: scale(1.05);
   }
+  @media (min-width: 768px) {
+    #preview {
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+    }
+  }
 
-  /* LIGHTBOX */
+  /* --- LIGHTBOX --- */
   body.no-scroll { overflow: hidden; }
   #lightbox {
     position: fixed;
@@ -188,7 +193,6 @@
       el.autoplay = true;
       el.playsInline = true; // iOS
     }
-    // toggle FS pe dublu-click
     el.addEventListener('dblclick', toggleFullscreen);
     lightboxContent.appendChild(el);
   }
@@ -197,7 +201,6 @@
     lightbox.style.display = 'none';
     document.body.classList.remove('no-scroll');
     lightbox.setAttribute('aria-hidden', 'true');
-    // ieșire din fullscreen dacă este activ
     exitFullscreenSafe();
     lightboxContent.innerHTML = '';
   }
@@ -212,39 +215,26 @@
     showItem();
   }
 
-  // Fullscreen helpers (cu fallback Safari)
   function requestFullscreenSafe(target) {
-    try {
-      if (target.requestFullscreen) return target.requestFullscreen();
-      if (target.webkitRequestFullscreen) return target.webkitRequestFullscreen(); // Safari
-      if (target.msRequestFullscreen) return target.msRequestFullscreen();
-    } catch(e) {}
+    if (target.requestFullscreen) return target.requestFullscreen();
+    if (target.webkitRequestFullscreen) return target.webkitRequestFullscreen();
+    if (target.msRequestFullscreen) return target.msRequestFullscreen();
   }
-
   function exitFullscreenSafe() {
-    try {
-      if (document.fullscreenElement) return document.exitFullscreen();
-      if (document.webkitFullscreenElement) return document.webkitExitFullscreen(); // Safari
-      if (document.msFullscreenElement) return document.msExitFullscreen && document.msExitFullscreen();
-    } catch(e) {}
+    if (document.fullscreenElement) return document.exitFullscreen();
+    if (document.webkitFullscreenElement) return document.webkitExitFullscreen();
+    if (document.msFullscreenElement) return document.msExitFullscreen();
   }
-
   function toggleFullscreen() {
     const fsEl = lightboxContent.firstElementChild || lightbox;
     const isFs = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-    if (isFs) {
-      exitFullscreenSafe();
-    } else {
-      // cerem fullscreen pe conținut (img/video) pentru un crop corect
-      requestFullscreenSafe(fsEl);
-    }
+    if (isFs) exitFullscreenSafe();
+    else requestFullscreenSafe(fsEl);
   }
 
-  // Închidere pe click pe fundal
   lightbox.addEventListener('click', (e) => {
     if (e.target === lightbox) closeLightbox();
   });
-
   closeBtn.onclick = closeLightbox;
   nextBtn.onclick = nextItem;
   prevBtn.onclick = prevItem;
@@ -259,7 +249,6 @@
     }
   });
 
-  // Încărcare imagini din Firebase
   async function loadImages() {
     preview.innerHTML = '';
     const listRef = storage.ref('uploads');
