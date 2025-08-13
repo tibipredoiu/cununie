@@ -63,21 +63,22 @@
     border-radius: 10px;
     box-shadow: 0 0 20px rgba(0,0,0,0.5);
   }
+  /* săgeți */
   .arrow {
     position: fixed;
     top: 50%;
+    transform: translateY(-50%);
     font-size: 3em;
     color: white;
-    background: rgba(0,0,0,0.3);
-    padding: 10px;
-    border-radius: 50%;
     cursor: pointer;
-    user-select: none;
     z-index: 1001;
-    transform: translateY(-50%);
+    user-select: none;
+    padding: 10px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 50%;
   }
-  #prevArrow { left: 10px; }
-  #nextArrow { right: 10px; }
+  #prevArrow { left: 10px; display:none; }
+  #nextArrow { right: 10px; display:none; }
 </style>
 </head>
 <body>
@@ -89,7 +90,7 @@
 
 <div id="preview"></div>
 
-<!-- Lightbox și săgeți -->
+<!-- Lightbox -->
 <div id="lightbox"></div>
 <div id="prevArrow" class="arrow">&#10094;</div>
 <div id="nextArrow" class="arrow">&#10095;</div>
@@ -108,7 +109,6 @@ const firebaseConfig = {
   appId: "1:847742419904:web:36b2a2eefe57ed6cc03e25",
   measurementId: "G-808VQG01VC"
 };
-
 firebase.initializeApp(firebaseConfig);
 const storage = firebase.storage();
 
@@ -136,9 +136,9 @@ fileInput.onchange = async (e) => {
 
 async function loadMedia(){
   preview.innerHTML = '';
+  mediaList = [];
   const listRef = storage.ref('uploads');
   const res = await listRef.listAll();
-  mediaList = [];
   for(const itemRef of res.items){
     const url = await itemRef.getDownloadURL();
     let elem;
@@ -153,17 +153,25 @@ async function loadMedia(){
       elem = document.createElement('img');
       elem.src = url;
     }
-    const index = mediaList.length;
+    let index = mediaList.length;
     elem.addEventListener('click', () => openLightbox(index));
     preview.appendChild(elem);
-    mediaList.push({type: elem.tagName.toLowerCase(), src: url});
+    mediaList.push({type: itemRef.name.match(/\.(mp4|webm|ogg)$/i) ? 'video' : 'image', src: url});
   }
 }
 
-// Lightbox
-function showMedia() {
+function openLightbox(index){
+  currentIndex = index;
+  showMedia();
+  lightbox.style.display = 'flex';
+  prevArrow.style.display = 'block';
+  nextArrow.style.display = 'block';
+  openFullscreen(lightbox);
+}
+
+function showMedia(){
   lightbox.innerHTML = '';
-  const item = mediaList[currentIndex];
+  let item = mediaList[currentIndex];
   let elem;
   if(item.type === 'video'){
     elem = document.createElement('video');
@@ -177,34 +185,27 @@ function showMedia() {
   lightbox.appendChild(elem);
 }
 
-function openLightbox(index){
-  currentIndex = index;
-  showMedia();
-  lightbox.style.display = 'flex';
-  prevArrow.style.display = 'block';
-  nextArrow.style.display = 'block';
-  openFullscreen(lightbox);
-}
-
-function closeLightbox() {
+function closeLightbox(){
   lightbox.style.display = 'none';
   prevArrow.style.display = 'none';
   nextArrow.style.display = 'none';
   closeFullscreen();
 }
 
-// Navigare
+prevArrow.onclick = (e) => { e.stopPropagation(); prevMedia(); };
+nextArrow.onclick = (e) => { e.stopPropagation(); nextMedia(); };
+
 function prevMedia(){
   currentIndex = (currentIndex - 1 + mediaList.length) % mediaList.length;
   showMedia();
 }
+
 function nextMedia(){
   currentIndex = (currentIndex + 1) % mediaList.length;
   showMedia();
 }
 
-prevArrow.onclick = (e) => { e.stopPropagation(); prevMedia(); };
-nextArrow.onclick = (e) => { e.stopPropagation(); nextMedia(); };
+// Click pe lightbox pentru închidere
 lightbox.onclick = closeLightbox;
 
 // Fullscreen universal
@@ -212,7 +213,11 @@ function openFullscreen(elem) {
   if(elem.requestFullscreen) elem.requestFullscreen();
   else if(elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
   else if(elem.msRequestFullscreen) elem.msRequestFullscreen();
-  else if(elem.webkitEnterFullscreen) elem.webkitEnterFullscreen();
+  else if(elem.webkitEnterFullscreen) elem.webkitEnterFullscreen(); // iOS video fallback
+  else { 
+    if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+    else if(document.documentElement.webkitRequestFullscreen) document.documentElement.webkitRequestFullscreen();
+  }
 }
 
 function closeFullscreen() {
@@ -220,26 +225,6 @@ function closeFullscreen() {
   else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
   else if(document.msExitFullscreen) document.msExitFullscreen();
 }
-
-// Swipe touch & drag mouse
-let startX = 0;
-let endX = 0;
-let isDragging = false;
-
-function handleSwipe() {
-  const diff = startX - endX;
-  const threshold = 50;
-  if(diff > threshold) nextMedia();
-  else if(diff < -threshold) prevMedia();
-}
-
-lightbox.addEventListener('touchstart', (e) => startX = e.touches[0].clientX);
-lightbox.addEventListener('touchmove', (e) => endX = e.touches[0].clientX);
-lightbox.addEventListener('touchend', handleSwipe);
-
-lightbox.addEventListener('mousedown', (e) => { isDragging = true; startX = e.clientX; });
-lightbox.addEventListener('mousemove', (e) => { if(isDragging) endX = e.clientX; });
-lightbox.addEventListener('mouseup', () => { if(isDragging){ handleSwipe(); isDragging=false; } });
 
 loadMedia();
 </script>
