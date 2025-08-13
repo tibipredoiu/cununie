@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Cristiana & Tibi - Galerie</title>
 <style>
+  :root{
+    --lb-bg: rgba(0,0,0,0.9);
+    --tile-gap-m: 4px;
+    --tile-gap-d: 10px;
+    --lb-radius: 10px;
+    --anim-ms: 320ms;
+  }
   body {
     font-family: 'Arial', sans-serif;
     background: linear-gradient(135deg, #ffdde1, #ee9ca7);
@@ -28,32 +35,28 @@
     margin: 20px 0;
   }
 
-  /* --- GALERIE TIP TELEFON --- */
+  /* --- GALERIE TIP TELEFON (pătrate egale) --- */
   #preview {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 4px;
+    gap: var(--tile-gap-m);
     max-width: 100%;
   }
-  #preview img, 
+  #preview img,
   #preview video {
     width: 100%;
     aspect-ratio: 1 / 1;
     object-fit: cover;
     border-radius: 0;
     box-shadow: none;
-    transition: transform 0.2s ease-in-out;
     cursor: pointer;
+    will-change: transform;
+    transition: transform .18s ease-in-out;
   }
-  #preview img:hover, 
-  #preview video:hover {
-    transform: scale(1.05);
-  }
+  #preview img:hover,
+  #preview video:hover { transform: scale(1.03); }
   @media (min-width: 768px) {
-    #preview {
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 10px;
-    }
+    #preview { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--tile-gap-d); }
   }
 
   /* --- LIGHTBOX --- */
@@ -61,12 +64,13 @@
   #lightbox {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.9);
-    display: none;
+    background: var(--lb-bg);
+    display: none; /* flex când e deschis */
     justify-content: center;
     align-items: center;
     z-index: 9999;
   }
+  #lightbox[aria-hidden="false"] { display: flex; }
   #lightbox-content {
     max-width: 90vw;
     max-height: 90vh;
@@ -74,38 +78,34 @@
     align-items: center;
     justify-content: center;
   }
-  #lightbox img, 
+  #lightbox img,
   #lightbox video {
     max-width: 100%;
     max-height: 100%;
-    border-radius: 10px;
+    border-radius: var(--lb-radius);
+    background: #000;
   }
   .lightbox-nav {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 3em;
-    color: white;
-    cursor: pointer;
-    padding: 10px;
-    user-select: none;
+    position: absolute; top: 50%; transform: translateY(-50%);
+    font-size: 3em; color: #fff; cursor: pointer; padding: 10px; user-select: none;
   }
   .lightbox-prev { left: 20px; }
   .lightbox-next { right: 20px; }
-  .lightbox-close {
-    position: absolute;
-    top: 20px; right: 30px;
-    font-size: 2em;
-    color: white;
-    cursor: pointer;
-  }
-  .lightbox-fs {
-    position: absolute;
-    top: 20px; left: 30px;
-    font-size: 1.6em;
-    color: white;
-    cursor: pointer;
-    user-select: none;
+  .lightbox-close { position: absolute; top: 20px; right: 30px; font-size: 2em; color: #fff; cursor: pointer; }
+  .lightbox-fs    { position: absolute; top: 20px; left: 30px; font-size: 1.6em; color: #fff; cursor: pointer; user-select: none; }
+
+  /* animații mici */
+  .fade-in { animation: fadeIn var(--anim-ms) ease both; }
+  .fade-out{ animation: fadeOut var(--anim-ms) ease both; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  @keyframes fadeOut{ from{opacity:1} to{opacity:0} }
+
+  /* Clona animată pentru tranziția tip Instagram */
+  .anim-clone{
+    position: fixed; inset: auto; z-index: 10000; pointer-events: none; border-radius: var(--lb-radius);
+    transform-origin: top left;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    background: #000;
   }
 </style>
 </head>
@@ -132,7 +132,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <script>
-  // Config Firebase
+  // === Config Firebase (client) ===
   const firebaseConfig = {
     apiKey: "AIzaSyAIeoK-hVEcb9ql1eX5ZzXBHCohuSZTAG4",
     authDomain: "cununie-54151.firebaseapp.com",
@@ -142,17 +142,14 @@
     appId: "1:847742419904:web:36b2a2eefe57ed6cc03e25",
     measurementId: "G-808VQG01VC"
   };
-
-  // Init Firebase
   firebase.initializeApp(firebaseConfig);
   const storage = firebase.storage();
 
   const fileInput = document.getElementById('fileInput');
   const uploadBtn = document.getElementById('uploadBtn');
-  const preview = document.getElementById('preview');
+  const preview   = document.getElementById('preview');
 
   uploadBtn.onclick = () => fileInput.click();
-
   fileInput.onchange = async (e) => {
     const files = e.target.files;
     for (let file of files) {
@@ -163,114 +160,184 @@
     loadImages();
   };
 
-  // LIGHTBOX + FULLSCREEN
-  const lightbox = document.getElementById('lightbox');
+  // === Lightbox + Fullscreen ===
+  const lightbox        = document.getElementById('lightbox');
   const lightboxContent = document.getElementById('lightbox-content');
   const closeBtn = document.querySelector('.lightbox-close');
-  const nextBtn = document.querySelector('.lightbox-next');
-  const prevBtn = document.querySelector('.lightbox-prev');
-  const fsBtn   = document.querySelector('.lightbox-fs');
+  const nextBtn  = document.querySelector('.lightbox-next');
+  const prevBtn  = document.querySelector('.lightbox-prev');
+  const fsBtn    = document.querySelector('.lightbox-fs');
 
-  let galleryItems = [];
+  let galleryItems = []; // elemente DOM (img/video) din grid
   let currentIndex = 0;
+  let lastThumbEl  = null; // pentru animația de întoarcere
 
-  function openLightbox(index) {
-    currentIndex = index;
-    showItem();
-    lightbox.style.display = 'flex';
-    document.body.classList.add('no-scroll');
-    lightbox.setAttribute('aria-hidden', 'false');
+  function setLightboxVisible(v){
+    lightbox.setAttribute('aria-hidden', v? 'false':'true');
+    document.body.classList.toggle('no-scroll', v);
   }
 
-  function showItem() {
+  async function openLightbox(index, triggerEl){
+    currentIndex = index;
+    lastThumbEl = triggerEl || galleryItems[index];
+
+    // 1) pregătim conținutul pentru a măsura targetRect
+    showItem();
+    lightbox.style.opacity = 0; // invizibil
+    setLightboxVisible(true);
+    const targetEl = lightboxContent.firstElementChild;
+    const targetRect = targetEl.getBoundingClientRect();
+    setLightboxVisible(false);
+    lightbox.style.opacity = '';
+
+    // 2) creăm clona la dimensiunea țintă, dar pornim din poziția thumb (FLIP)
+    const thumbRect = lastThumbEl.getBoundingClientRect();
+    const clone = targetEl.cloneNode(true);
+    clone.className = 'anim-clone';
+    document.body.appendChild(clone);
+    Object.assign(clone.style, {
+      top: targetRect.top + 'px', left: targetRect.left + 'px', width: targetRect.width + 'px', height: targetRect.height + 'px'
+    });
+    const dx = thumbRect.left - targetRect.left;
+    const dy = thumbRect.top  - targetRect.top;
+    const sx = thumbRect.width  / targetRect.width;
+    const sy = thumbRect.height / targetRect.height;
+    clone.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+
+    // 3) declanșăm animația către poziția finală (transform -> none)
+    requestAnimationFrame(() => {
+      clone.style.transition = `transform var(--anim-ms) cubic-bezier(.2,.8,.2,1), opacity var(--anim-ms)`;
+      clone.style.transform = 'none';
+      clone.style.opacity = '1';
+    });
+
+    // 4) la final: arătăm lightbox și eliminăm clona
+    clone.addEventListener('transitionend', () => {
+      clone.remove();
+      setLightboxVisible(true);
+      lightbox.classList.add('fade-in');
+      setTimeout(()=> lightbox.classList.remove('fade-in'), 340);
+    }, { once: true });
+  }
+
+  function showItem(){
     lightboxContent.innerHTML = '';
     const src = galleryItems[currentIndex].src;
     const isVideo = galleryItems[currentIndex].tagName.toLowerCase() === 'video';
     const el = document.createElement(isVideo ? 'video' : 'img');
     el.src = src;
-    if (isVideo) {
-      el.controls = true;
-      el.autoplay = true;
-      el.playsInline = true; // iOS
-    }
+    if (isVideo) { el.controls = true; el.autoplay = true; el.playsInline = true; }
     el.addEventListener('dblclick', toggleFullscreen);
     lightboxContent.appendChild(el);
   }
 
-  function closeLightbox() {
-    lightbox.style.display = 'none';
-    document.body.classList.remove('no-scroll');
-    lightbox.setAttribute('aria-hidden', 'true');
+  function closeLightbox(){
+    // animație inversă către thumbnail
+    const targetEl = lightboxContent.firstElementChild;
+    if (targetEl && lastThumbEl) {
+      const targetRect = targetEl.getBoundingClientRect();
+      const thumbRect  = lastThumbEl.getBoundingClientRect();
+      const clone = targetEl.cloneNode(true);
+      clone.className = 'anim-clone';
+      document.body.appendChild(clone);
+      Object.assign(clone.style, {
+        top: targetRect.top + 'px', left: targetRect.left + 'px', width: targetRect.width + 'px', height: targetRect.height + 'px', transform: 'none', opacity: '1'
+      });
+      const dx = thumbRect.left - targetRect.left;
+      const dy = thumbRect.top  - targetRect.top;
+      const sx = thumbRect.width  / targetRect.width;
+      const sy = thumbRect.height / targetRect.height;
+
+      setLightboxVisible(false);
+      clone.offsetHeight; // reflow
+      clone.style.transition = `transform var(--anim-ms) cubic-bezier(.2,.8,.2,1), opacity var(--anim-ms)`;
+      clone.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+      clone.addEventListener('transitionend', () => clone.remove(), { once: true });
+    } else {
+      setLightboxVisible(false);
+    }
+
     exitFullscreenSafe();
     lightboxContent.innerHTML = '';
   }
 
-  function nextItem() {
-    currentIndex = (currentIndex + 1) % galleryItems.length;
-    showItem();
+  function nextItem(){ currentIndex = (currentIndex + 1) % galleryItems.length; showItem(); }
+  function prevItem(){ currentIndex = (currentIndex - 1 + galleryItems.length) % galleryItems.length; showItem(); }
+
+  // === Fullscreen helpers (inclusiv iOS Safari video) ===
+  async function requestFullscreenSafe(target){
+    try {
+      if (!target) target = lightboxContent.firstElementChild || lightbox;
+      // iOS Safari: video poate folosi webkitEnterFullscreen (nativ, fără DOM FS)
+      if (target.tagName === 'VIDEO' && target.webkitEnterFullscreen && !document.fullscreenEnabled) {
+        target.webkitEnterFullscreen();
+        return;
+      }
+      if (target.requestFullscreen) { await target.requestFullscreen(); return; }
+      if (target.webkitRequestFullscreen) { await target.webkitRequestFullscreen(); return; }
+      if (target.msRequestFullscreen) { await target.msRequestFullscreen(); return; }
+      // fallback: cerem pe overlay
+      const lb = document.getElementById('lightbox');
+      if (lb.requestFullscreen) { await lb.requestFullscreen(); return; }
+      if (lb.webkitRequestFullscreen) { await lb.webkitRequestFullscreen(); return; }
+    } catch (e) {
+      console.warn('Fullscreen error:', e);
+    }
+  }
+  async function exitFullscreenSafe(){
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) { await document.exitFullscreen(); }
+      else if (document.webkitFullscreenElement && document.webkitExitFullscreen) { await document.webkitExitFullscreen(); }
+      // iOS video iese singur din nativ; nu avem API dedicat.
+    } catch(e){ console.warn('Exit FS error:', e); }
+  }
+  function isFullscreen(){
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function toggleFullscreen(){
+    if (isFullscreen()) exitFullscreenSafe(); else requestFullscreenSafe(lightboxContent.firstElementChild);
   }
 
-  function prevItem() {
-    currentIndex = (currentIndex - 1 + galleryItems.length) % galleryItems.length;
-    showItem();
-  }
-
-  function requestFullscreenSafe(target) {
-    if (target.requestFullscreen) return target.requestFullscreen();
-    if (target.webkitRequestFullscreen) return target.webkitRequestFullscreen();
-    if (target.msRequestFullscreen) return target.msRequestFullscreen();
-  }
-  function exitFullscreenSafe() {
-    if (document.fullscreenElement) return document.exitFullscreen();
-    if (document.webkitFullscreenElement) return document.webkitExitFullscreen();
-    if (document.msFullscreenElement) return document.msExitFullscreen();
-  }
-  function toggleFullscreen() {
-    const fsEl = lightboxContent.firstElementChild || lightbox;
-    const isFs = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-    if (isFs) exitFullscreenSafe();
-    else requestFullscreenSafe(fsEl);
-  }
-
-  lightbox.addEventListener('click', (e) => {
-    if (e.target === lightbox) closeLightbox();
-  });
+  // Comenzi lightbox
+  lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLightbox(); });
   closeBtn.onclick = closeLightbox;
-  nextBtn.onclick = nextItem;
-  prevBtn.onclick = prevItem;
-  fsBtn.onclick   = toggleFullscreen;
+  nextBtn.onclick  = nextItem;
+  prevBtn.onclick  = prevItem;
+  fsBtn.onclick    = toggleFullscreen;
 
   window.addEventListener('keydown', (e) => {
-    if (lightbox.style.display === 'flex') {
+    if (lightbox.getAttribute('aria-hidden') === 'false') {
       if (e.key === 'ArrowRight') nextItem();
-      if (e.key === 'ArrowLeft') prevItem();
-      if (e.key === 'Escape') closeLightbox();
-      if (e.key.toLowerCase() === 'f') toggleFullscreen();
+      if (e.key === 'ArrowLeft')  prevItem();
+      if (e.key === 'Escape')     closeLightbox();
+      if (e.key.toLowerCase?.() === 'f') toggleFullscreen();
     }
   });
 
+  // === Încărcare imagini din Firebase ===
   async function loadImages() {
     preview.innerHTML = '';
     const listRef = storage.ref('uploads');
     const res = await listRef.listAll();
+
+    // Sortăm după nume (conține timestamp-ul de la upload)
+    const items = res.items.sort((a,b) => a.name.localeCompare(b.name));
+
     galleryItems = [];
     let index = 0;
-    for (const itemRef of res.items) {
+    for (const itemRef of items) {
       const url = await itemRef.getDownloadURL();
-      let element;
-      if (itemRef.name.match(/\.(mp4|webm|ogg)$/i)) {
-        element = document.createElement('video');
-        element.src = url;
-        element.controls = true;
-        element.playsInline = true;
+      let el;
+      if (/\.(mp4|webm|ogg)$/i.test(itemRef.name)) {
+        el = document.createElement('video');
+        el.src = url; el.controls = true; el.playsInline = true;
       } else {
-        element = document.createElement('img');
-        element.src = url;
-        element.loading = 'lazy';
+        el = document.createElement('img');
+        el.src = url; el.loading = 'lazy';
       }
-      element.addEventListener('click', () => openLightbox(index));
-      galleryItems.push(element);
-      preview.appendChild(element);
+      el.addEventListener('click', () => openLightbox(index, el));
+      galleryItems.push(el);
+      preview.appendChild(el);
       index++;
     }
   }
