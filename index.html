@@ -40,14 +40,12 @@
     object-fit: cover;
     border-radius: 8px;
     cursor: pointer;
-    transition: none; /* hover dezactivat */
   }
-
   /* Lightbox */
   #lightbox {
     position: fixed;
     display: none;
-    top: 0; left: 0;
+    top:0; left:0;
     width: 100%; height: 100%;
     background: rgba(0,0,0,0.95);
     justify-content: center;
@@ -61,21 +59,19 @@
     border-radius: 10px;
     box-shadow: 0 0 20px rgba(0,0,0,0.5);
   }
-  #prev, #next {
-    position: fixed;
+  /* Săgeți */
+  .arrow {
+    position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    font-size: 2em;
     color: white;
+    font-size: 3em;
     cursor: pointer;
-    padding: 10px;
-    background: rgba(0,0,0,0.3);
-    border-radius: 50%;
     user-select: none;
     z-index: 1001;
   }
-  #prev { left: 10px; }
-  #next { right: 10px; }
+  .arrow.left { left: 10px; }
+  .arrow.right { right: 10px; }
 </style>
 </head>
 <body>
@@ -89,8 +85,8 @@
 
 <!-- Lightbox -->
 <div id="lightbox">
-  <span id="prev">&#10094;</span>
-  <span id="next">&#10095;</span>
+  <span class="arrow left">&#10094;</span>
+  <span class="arrow right">&#10095;</span>
 </div>
 
 <!-- Firebase SDK -->
@@ -115,8 +111,8 @@ const fileInput = document.getElementById('fileInput');
 const uploadBtn = document.getElementById('uploadBtn');
 const preview = document.getElementById('preview');
 const lightbox = document.getElementById('lightbox');
-const prevBtn = document.getElementById('prev');
-const nextBtn = document.getElementById('next');
+const leftArrow = lightbox.querySelector('.arrow.left');
+const rightArrow = lightbox.querySelector('.arrow.right');
 
 let mediaElements = [];
 let currentIndex = 0;
@@ -152,43 +148,49 @@ async function loadMedia(){
       elem = document.createElement('img');
       elem.src = url;
     }
+    // click si touch
     elem.addEventListener('click', () => openLightbox(mediaElements.indexOf(elem)));
-    elem.addEventListener('touchstart', () => openLightbox(mediaElements.indexOf(elem)));
+    elem.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      openLightbox(mediaElements.indexOf(elem));
+    });
     preview.appendChild(elem);
     mediaElements.push(elem);
   }
 }
 
-function openLightbox(index){
+// Lightbox
+function openLightbox(index) {
   currentIndex = index;
   lightbox.innerHTML = '';
-  const clone = mediaElements[currentIndex].cloneNode(true);
+  
+  const clone = mediaElements[index].cloneNode(true);
   clone.style.maxWidth = '95%';
   clone.style.maxHeight = '95%';
   clone.style.borderRadius = '10px';
-  clone.style.boxShadow = '0 0 20px rgba(0,0,0,0.5)';
   lightbox.appendChild(clone);
 
-  // adaugă săgeți
-  lightbox.appendChild(prevBtn);
-  lightbox.appendChild(nextBtn);
+  // adauga sageti
+  lightbox.appendChild(leftArrow);
+  lightbox.appendChild(rightArrow);
 
   lightbox.style.display = 'flex';
+
+  leftArrow.onclick = (e) => { e.stopPropagation(); prevMedia(); };
+  rightArrow.onclick = (e) => { e.stopPropagation(); nextMedia(); };
+
+  lightbox.onclick = () => { lightbox.style.display = 'none'; };
 }
 
-function showPrev(){
+function prevMedia() {
   currentIndex = (currentIndex - 1 + mediaElements.length) % mediaElements.length;
   openLightbox(currentIndex);
 }
 
-function showNext(){
+function nextMedia() {
   currentIndex = (currentIndex + 1) % mediaElements.length;
   openLightbox(currentIndex);
 }
-
-prevBtn.onclick = (e) => { e.stopPropagation(); showPrev(); };
-nextBtn.onclick = (e) => { e.stopPropagation(); showNext(); };
-lightbox.onclick = () => { lightbox.style.display = 'none'; };
 
 loadMedia();
 </script>
