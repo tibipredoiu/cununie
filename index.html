@@ -28,7 +28,6 @@ h1 { font-family: 'Great Vibes', cursive; font-size: 3em; margin-bottom: 10px; }
     border-radius: 8px;
     cursor: pointer;
 }
-/* Lightbox */
 #lightbox {
     position: fixed;
     display: none;
@@ -64,7 +63,6 @@ h1 { font-family: 'Great Vibes', cursive; font-size: 3em; margin-bottom: 10px; }
 <button id="uploadBtn">📸 Încarcă poze sau videoclipuri</button>
 <div id="preview"></div>
 
-<!-- Lightbox -->
 <div id="lightbox">
     <span class="arrow left">&#10094;</span>
     <span class="arrow right">&#10095;</span>
@@ -101,10 +99,12 @@ uploadBtn.onclick = () => fileInput.click();
 
 fileInput.onchange = async (e) => {
     const files = e.target.files;
+    const uploadPromises = [];
     for (let file of files) {
         const storageRef = storage.ref('uploads/' + file.name + '-' + Date.now());
-        await storageRef.put(file);
+        uploadPromises.push(storageRef.put(file));
     }
+    await Promise.all(uploadPromises);
     alert('Fișiere încărcate!');
     loadMedia();
 };
@@ -114,26 +114,33 @@ async function loadMedia() {
     const listRef = storage.ref('uploads');
     const res = await listRef.listAll();
     mediaList = [];
-    for (const itemRef of res.items) {
+
+    // Obținem URL-urile paralel
+    const items = await Promise.all(res.items.map(async itemRef => {
         const url = await itemRef.getDownloadURL();
+        const type = itemRef.name.match(/\.(mp4|webm|ogg)$/i) ? 'video' : 'image';
+        return { type, url };
+    }));
+
+    items.forEach((media, index) => {
         let elem;
-        if (itemRef.name.match(/\.(mp4|webm|ogg)$/i)) {
+        if (media.type === 'video') {
             elem = document.createElement('video');
-            elem.src = url;
+            elem.src = media.url;
             elem.controls = false;
             elem.muted = true;
             elem.loop = true;
             elem.autoplay = true;
         } else {
             elem = document.createElement('img');
-            elem.src = url;
-            elem.loading = 'lazy'; // lazy load
+            elem.src = media.url; // dacă ai thumbnail, pune url-ul thumbnail-ului aici
+            elem.loading = 'lazy';
         }
-        elem.dataset.index = mediaList.length;
-        elem.addEventListener('click', () => openLightbox(parseInt(elem.dataset.index)));
+        elem.dataset.index = index;
+        elem.addEventListener('click', () => openLightbox(index));
         preview.appendChild(elem);
-        mediaList.push({type: elem.tagName.toLowerCase(), url});
-    }
+        mediaList.push(media);
+    });
 }
 
 // Lightbox
@@ -157,9 +164,7 @@ function showLightbox() {
     }
     lightbox.appendChild(elem);
 }
-lightbox.onclick = (e) => {
-    if (e.target === lightbox) lightbox.style.display = 'none';
-}
+lightbox.onclick = (e) => { if (e.target === lightbox) lightbox.style.display = 'none'; }
 leftArrow.onclick = (e) => { e.stopPropagation(); currentIndex = (currentIndex-1+mediaList.length)%mediaList.length; showLightbox(); }
 rightArrow.onclick = (e) => { e.stopPropagation(); currentIndex = (currentIndex+1)%mediaList.length; showLightbox(); }
 
