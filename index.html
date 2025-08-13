@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Cristiana & Tibi - Upload Galerie</title>
+<title>Cristiana & Tibi - Galerie</title>
 <style>
   body {
     font-family: 'Arial', sans-serif;
@@ -27,16 +27,80 @@
     cursor: pointer;
     margin: 20px 0;
   }
+  /* GALERIE GRID */
   #preview {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 15px;
+    padding: 10px;
+    max-width: 1200px;
+    margin: auto;
   }
-  img, video {
-    max-width: 45vw;
+  #preview img, 
+  #preview video {
+    width: 100%;
+    height: auto;
     border-radius: 15px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    object-fit: cover;
+    transition: transform 0.2s ease-in-out;
+    cursor: pointer;
+  }
+  #preview img:hover, 
+  #preview video:hover {
+    transform: scale(1.05);
+  }
+
+  /* LIGHTBOX */
+  body.no-scroll { overflow: hidden; }
+  #lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+  }
+  #lightbox-content {
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #lightbox img, 
+  #lightbox video {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 10px;
+  }
+  .lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 3em;
+    color: white;
+    cursor: pointer;
+    padding: 10px;
+    user-select: none;
+  }
+  .lightbox-prev { left: 20px; }
+  .lightbox-next { right: 20px; }
+  .lightbox-close {
+    position: absolute;
+    top: 20px; right: 30px;
+    font-size: 2em;
+    color: white;
+    cursor: pointer;
+  }
+  .lightbox-fs {
+    position: absolute;
+    top: 20px; left: 30px;
+    font-size: 1.6em;
+    color: white;
+    cursor: pointer;
+    user-select: none;
   }
 </style>
 </head>
@@ -49,23 +113,32 @@
 
 <div id="preview"></div>
 
+<!-- LIGHTBOX -->
+<div id="lightbox" aria-hidden="true">
+  <span class="lightbox-close" title="Închide">&times;</span>
+  <span class="lightbox-fs" title="Ecran complet">⛶</span>
+  <span class="lightbox-nav lightbox-prev" title="Înapoi">&#10094;</span>
+  <span class="lightbox-nav lightbox-next" title="Înainte">&#10095;</span>
+  <div id="lightbox-content"></div>
+</div>
+
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <script>
-  // TODO: Pune aici config-ul tău Firebase:
- const firebaseConfig = {
-  apiKey: "AIzaSyAIeoK-hVEcb9ql1eX5ZzXBHCohuSZTAG4",
-  authDomain: "cununie-54151.firebaseapp.com",
-  projectId: "cununie-54151",
-  storageBucket: "cununie-54151.firebasestorage.app",
-  messagingSenderId: "847742419904",
-  appId: "1:847742419904:web:36b2a2eefe57ed6cc03e25",
-  measurementId: "G-808VQG01VC"
-};
+  // Config Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyAIeoK-hVEcb9ql1eX5ZzXBHCohuSZTAG4",
+    authDomain: "cununie-54151.firebaseapp.com",
+    projectId: "cununie-54151",
+    storageBucket: "cununie-54151.firebasestorage.app",
+    messagingSenderId: "847742419904",
+    appId: "1:847742419904:web:36b2a2eefe57ed6cc03e25",
+    measurementId: "G-808VQG01VC"
+  };
 
-  // Initialize Firebase
+  // Init Firebase
   firebase.initializeApp(firebaseConfig);
   const storage = firebase.storage();
 
@@ -77,7 +150,7 @@
 
   fileInput.onchange = async (e) => {
     const files = e.target.files;
-    for(let file of files){
+    for (let file of files) {
       const storageRef = storage.ref('uploads/' + file.name + '-' + Date.now());
       await storageRef.put(file);
     }
@@ -85,28 +158,136 @@
     loadImages();
   };
 
-  async function loadImages(){
-    preview.innerHTML = '';
-    const listRef = storage.ref('uploads');
-    const res = await listRef.listAll();
-    for(const itemRef of res.items){
-      const url = await itemRef.getDownloadURL();
-      if(itemRef.name.match(/\.(mp4|webm|ogg)$/i)){
-        const video = document.createElement('video');
-        video.src = url;
-        video.controls = true;
-        preview.appendChild(video);
-      } else {
-        const img = document.createElement('img');
-        img.src = url;
-        preview.appendChild(img);
-      }
+  // LIGHTBOX + FULLSCREEN
+  const lightbox = document.getElementById('lightbox');
+  const lightboxContent = document.getElementById('lightbox-content');
+  const closeBtn = document.querySelector('.lightbox-close');
+  const nextBtn = document.querySelector('.lightbox-next');
+  const prevBtn = document.querySelector('.lightbox-prev');
+  const fsBtn   = document.querySelector('.lightbox-fs');
+
+  let galleryItems = [];
+  let currentIndex = 0;
+
+  function openLightbox(index) {
+    currentIndex = index;
+    showItem();
+    lightbox.style.display = 'flex';
+    document.body.classList.add('no-scroll');
+    lightbox.setAttribute('aria-hidden', 'false');
+  }
+
+  function showItem() {
+    lightboxContent.innerHTML = '';
+    const src = galleryItems[currentIndex].src;
+    const isVideo = galleryItems[currentIndex].tagName.toLowerCase() === 'video';
+    const el = document.createElement(isVideo ? 'video' : 'img');
+    el.src = src;
+    if (isVideo) {
+      el.controls = true;
+      el.autoplay = true;
+      el.playsInline = true; // iOS
+    }
+    // toggle FS pe dublu-click
+    el.addEventListener('dblclick', toggleFullscreen);
+    lightboxContent.appendChild(el);
+  }
+
+  function closeLightbox() {
+    lightbox.style.display = 'none';
+    document.body.classList.remove('no-scroll');
+    lightbox.setAttribute('aria-hidden', 'true');
+    // ieșire din fullscreen dacă este activ
+    exitFullscreenSafe();
+    lightboxContent.innerHTML = '';
+  }
+
+  function nextItem() {
+    currentIndex = (currentIndex + 1) % galleryItems.length;
+    showItem();
+  }
+
+  function prevItem() {
+    currentIndex = (currentIndex - 1 + galleryItems.length) % galleryItems.length;
+    showItem();
+  }
+
+  // Fullscreen helpers (cu fallback Safari)
+  function requestFullscreenSafe(target) {
+    try {
+      if (target.requestFullscreen) return target.requestFullscreen();
+      if (target.webkitRequestFullscreen) return target.webkitRequestFullscreen(); // Safari
+      if (target.msRequestFullscreen) return target.msRequestFullscreen();
+    } catch(e) {}
+  }
+
+  function exitFullscreenSafe() {
+    try {
+      if (document.fullscreenElement) return document.exitFullscreen();
+      if (document.webkitFullscreenElement) return document.webkitExitFullscreen(); // Safari
+      if (document.msFullscreenElement) return document.msExitFullscreen && document.msExitFullscreen();
+    } catch(e) {}
+  }
+
+  function toggleFullscreen() {
+    const fsEl = lightboxContent.firstElementChild || lightbox;
+    const isFs = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+    if (isFs) {
+      exitFullscreenSafe();
+    } else {
+      // cerem fullscreen pe conținut (img/video) pentru un crop corect
+      requestFullscreenSafe(fsEl);
     }
   }
 
-  loadImages(); // la încărcare, afișează pozele/video încărcate
+  // Închidere pe click pe fundal
+  lightbox.addEventListener('click', (e) => {
+    if (e.target === lightbox) closeLightbox();
+  });
+
+  closeBtn.onclick = closeLightbox;
+  nextBtn.onclick = nextItem;
+  prevBtn.onclick = prevItem;
+  fsBtn.onclick   = toggleFullscreen;
+
+  window.addEventListener('keydown', (e) => {
+    if (lightbox.style.display === 'flex') {
+      if (e.key === 'ArrowRight') nextItem();
+      if (e.key === 'ArrowLeft') prevItem();
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key.toLowerCase() === 'f') toggleFullscreen();
+    }
+  });
+
+  // Încărcare imagini din Firebase
+  async function loadImages() {
+    preview.innerHTML = '';
+    const listRef = storage.ref('uploads');
+    const res = await listRef.listAll();
+    galleryItems = [];
+    let index = 0;
+    for (const itemRef of res.items) {
+      const url = await itemRef.getDownloadURL();
+      let element;
+      if (itemRef.name.match(/\.(mp4|webm|ogg)$/i)) {
+        element = document.createElement('video');
+        element.src = url;
+        element.controls = true;
+        element.playsInline = true;
+      } else {
+        element = document.createElement('img');
+        element.src = url;
+        element.loading = 'lazy';
+      }
+      element.addEventListener('click', () => openLightbox(index));
+      galleryItems.push(element);
+      preview.appendChild(element);
+      index++;
+    }
+  }
+
+  loadImages();
 </script>
 
 </body>
 </html>
-
