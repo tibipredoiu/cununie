@@ -43,14 +43,16 @@
     transition: transform 0.3s;
   }
   #preview img:hover, #preview video:hover {
-    transform: scale(1.05);
+    transform: scale(1.1);
   }
-  /* Lightbox */
+
+  /* Lightbox virtual fullscreen */
   #lightbox {
     position: fixed;
     display: none;
     top:0; left:0;
-    width: 100%; height: 100%;
+    width: 100vw; 
+    height: 100vh;
     background: rgba(0,0,0,0.95);
     justify-content: center;
     align-items: center;
@@ -58,12 +60,14 @@
     overflow: hidden;
   }
   #lightbox img, #lightbox video {
-    max-width: 95%;
-    max-height: 95%;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
     border-radius: 10px;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    transition: transform 0.3s;
   }
-  /* săgeți */
+
+  /* Săgeți */
   .arrow {
     position: fixed;
     top: 50%;
@@ -76,9 +80,10 @@
     padding: 10px;
     background: rgba(0,0,0,0.3);
     border-radius: 50%;
+    display: none;
   }
-  #prevArrow { left: 10px; display:none; }
-  #nextArrow { right: 10px; display:none; }
+  #prevArrow { left: 10px; }
+  #nextArrow { right: 10px; }
 </style>
 </head>
 <body>
@@ -121,6 +126,7 @@ const nextArrow = document.getElementById('nextArrow');
 
 let mediaList = [];
 let currentIndex = 0;
+let touchStartX = 0;
 
 uploadBtn.onclick = () => fileInput.click();
 
@@ -155,6 +161,7 @@ async function loadMedia(){
     }
     let index = mediaList.length;
     elem.addEventListener('click', () => openLightbox(index));
+    elem.addEventListener('touchstart', () => openLightbox(index));
     preview.appendChild(elem);
     mediaList.push({type: itemRef.name.match(/\.(mp4|webm|ogg)$/i) ? 'video' : 'image', src: url});
   }
@@ -166,7 +173,6 @@ function openLightbox(index){
   lightbox.style.display = 'flex';
   prevArrow.style.display = 'block';
   nextArrow.style.display = 'block';
-  openFullscreen(lightbox);
 }
 
 function showMedia(){
@@ -189,7 +195,6 @@ function closeLightbox(){
   lightbox.style.display = 'none';
   prevArrow.style.display = 'none';
   nextArrow.style.display = 'none';
-  closeFullscreen();
 }
 
 prevArrow.onclick = (e) => { e.stopPropagation(); prevMedia(); };
@@ -205,26 +210,18 @@ function nextMedia(){
   showMedia();
 }
 
-// Click pe lightbox pentru închidere
+// Swipe pe mobil
+lightbox.addEventListener('touchstart', (e) => {
+  touchStartX = e.changedTouches[0].screenX;
+});
+lightbox.addEventListener('touchend', (e) => {
+  let touchEndX = e.changedTouches[0].screenX;
+  let diff = touchStartX - touchEndX;
+  if(diff > 50) nextMedia(); // swipe left
+  if(diff < -50) prevMedia(); // swipe right
+});
+
 lightbox.onclick = closeLightbox;
-
-// Fullscreen universal
-function openFullscreen(elem) {
-  if(elem.requestFullscreen) elem.requestFullscreen();
-  else if(elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-  else if(elem.msRequestFullscreen) elem.msRequestFullscreen();
-  else if(elem.webkitEnterFullscreen) elem.webkitEnterFullscreen(); // iOS video fallback
-  else { 
-    if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
-    else if(document.documentElement.webkitRequestFullscreen) document.documentElement.webkitRequestFullscreen();
-  }
-}
-
-function closeFullscreen() {
-  if(document.exitFullscreen) document.exitFullscreen();
-  else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
-  else if(document.msExitFullscreen) document.msExitFullscreen();
-}
 
 loadMedia();
 </script>
